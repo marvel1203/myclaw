@@ -3,6 +3,7 @@ set -euo pipefail
 
 # OpenClaw Installer for macOS and Linux
 # Usage: curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
+# Optional: set OPENCLAW_REPO_URL to override the git clone source
 
 BOLD='\033[1m'
 ACCENT='\033[38;2;255;77;77m'       # coral-bright  #ff4d4d
@@ -1896,7 +1897,8 @@ resolve_openclaw_bin() {
 
 install_openclaw_from_git() {
     local repo_dir="$1"
-    local repo_url="https://github.com/marvel1203/openclaw.git"
+    # Allow overriding the default git source with OPENCLAW_REPO_URL.
+    local repo_url="${OPENCLAW_REPO_URL:-https://github.com/marvel1203/openclaw.git}"
 
     if [[ -d "$repo_dir/.git" ]]; then
         ui_info "Installing OpenClaw from git checkout: ${repo_dir}"

@@ -1,6 +1,7 @@
 # OpenClaw Installer for Windows (PowerShell)
 # Usage: iwr -useb https://openclaw.ai/install.ps1 | iex
 # Or: & ([scriptblock]::Create((iwr -useb https://openclaw.ai/install.ps1))) -NoOnboard
+# Optional: set OPENCLAW_REPO_URL to override the git clone source
 
 param(
     [string]$InstallMethod = "npm",
@@ -217,12 +218,14 @@ function Install-OpenClawNpm {
 
 function Install-OpenClawGit {
     param([string]$RepoDir, [switch]$Update)
+    # Allow overriding the default git source with OPENCLAW_REPO_URL.
+    $repoUrl = if ($env:OPENCLAW_REPO_URL) { $env:OPENCLAW_REPO_URL } else { "https://github.com/marvel1203/openclaw.git" }
     
     Write-Host "Installing OpenClaw from git..." -Level info
     
     if (!(Test-Path $RepoDir)) {
         Write-Host "  Cloning repository..." -Level info
-        git clone https://github.com/marvel1203/openclaw.git $RepoDir 2>&1
+        git clone $repoUrl $RepoDir 2>&1
     } elseif ($Update) {
         Write-Host "  Updating repository..." -Level info
         git -C $RepoDir pull --rebase 2>&1

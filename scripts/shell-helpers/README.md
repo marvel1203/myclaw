@@ -2,25 +2,25 @@
 
 不用再手敲 `docker-compose`，直接执行 `clawdock-start`。
 
-Inspired by Simon Willison's [Running OpenClaw in Docker](https://til.simonwillison.net/llms/openclaw-docker).
+灵感来自 Simon Willison 的 [Running OpenClaw in Docker](https://til.simonwillison.net/llms/openclaw-docker)。
 
-- [快速开始](#quickstart)
-- [可用命令](#available-commands)
-  - [基础操作](#basic-operations)
-  - [容器访问](#container-access)
-  - [Web UI 与设备](#web-ui--devices)
-  - [初始化与配置](#setup--configuration)
-  - [维护命令](#maintenance)
-  - [工具命令](#utilities)
-- [常见工作流](#common-workflows)
-  - [查看状态与日志](#check-status-and-logs)
-  - [配置 WhatsApp 机器人](#set-up-whatsapp-bot)
-  - [排查设备配对问题](#troubleshooting-device-pairing)
-  - [修复令牌不一致问题](#fix-token-mismatch-issues)
-  - [权限不足](#permission-denied)
-- [环境要求](#requirements)
+- [快速开始](#快速开始)
+- [可用命令](#可用命令)
+  - [基础操作](#基础操作)
+  - [容器访问](#容器访问)
+  - [Web UI 与设备](#web-ui-与设备)
+  - [初始化与配置](#初始化与配置)
+  - [维护命令](#维护命令)
+  - [工具命令](#工具命令)
+- [常见工作流](#常见工作流)
+  - [查看状态与日志](#查看状态与日志)
+  - [配置 WhatsApp 机器人](#配置-whatsapp-机器人)
+  - [排查设备配对问题](#排查设备配对问题)
+  - [修复令牌不一致问题](#修复令牌不一致问题)
+  - [权限不足](#权限不足)
+- [环境要求](#环境要求)
 
-## Quickstart
+## 快速开始
 
 **安装：**
 
@@ -70,9 +70,9 @@ clawdock-devices
 clawdock-approve <request-id>
 ```
 
-## Available Commands
+## 可用命令
 
-### Basic Operations
+### 基础操作
 
 | 命令               | 说明                     |
 | ------------------ | ------------------------ |
@@ -82,7 +82,7 @@ clawdock-approve <request-id>
 | `clawdock-status`  | 查看容器状态             |
 | `clawdock-logs`    | 查看实时日志（持续跟随） |
 
-### Container Access
+### 容器访问
 
 | 命令                      | 说明                        |
 | ------------------------- | --------------------------- |
@@ -90,7 +90,7 @@ clawdock-approve <request-id>
 | `clawdock-cli <command>`  | 在容器内执行 OpenClaw CLI   |
 | `clawdock-exec <command>` | 在容器内执行任意命令        |
 
-### Web UI & Devices
+### Web UI 与设备
 
 | 命令                    | 说明                          |
 | ----------------------- | ----------------------------- |
@@ -98,20 +98,20 @@ clawdock-approve <request-id>
 | `clawdock-devices`      | 列出设备配对请求              |
 | `clawdock-approve <id>` | 审批指定设备配对请求          |
 
-### Setup & Configuration
+### 初始化与配置
 
 | 命令                 | 说明                                    |
 | -------------------- | --------------------------------------- |
 | `clawdock-fix-token` | 配置 gateway 认证 token（一般只需一次） |
 
-### Maintenance
+### 维护命令
 
 | 命令               | 说明                             |
 | ------------------ | -------------------------------- |
 | `clawdock-rebuild` | 重新构建 Docker 镜像             |
 | `clawdock-clean`   | 删除所有容器与数据卷（危险操作） |
 
-### Utilities
+### 工具命令
 
 | 命令                 | 说明                     |
 | -------------------- | ------------------------ |
@@ -122,9 +122,9 @@ clawdock-approve <request-id>
 | `clawdock-workspace` | 打开工作目录             |
 | `clawdock-help`      | 显示全部命令和示例       |
 
-## Common Workflows
+## 常见工作流
 
-### Check Status and Logs
+### 查看状态与日志
 
 **重启 gateway：**
 
@@ -144,7 +144,7 @@ clawdock-status
 clawdock-logs
 ```
 
-### Set Up WhatsApp Bot
+### 配置 WhatsApp 机器人
 
 **进入容器 shell：**
 
@@ -166,7 +166,7 @@ openclaw channels login --channel whatsapp --verbose
 openclaw status
 ```
 
-### Troubleshooting Device Pairing
+### 排查设备配对问题
 
 **查看待审批的配对请求：**
 
@@ -182,7 +182,7 @@ clawdock-approve <request-id>
 
 然后刷新浏览器。
 
-### Fix Token Mismatch Issues
+### 修复令牌不一致问题
 
 如果你看到 “gateway token mismatch” 错误：
 
@@ -197,7 +197,7 @@ clawdock-fix-token
 3. 重启 gateway
 4. 校验配置
 
-### Permission Denied
+### 权限不足
 
 **先确认 Docker 正在运行且当前用户有权限：**
 
@@ -205,13 +205,13 @@ clawdock-fix-token
 docker ps
 ```
 
-## Requirements
+## 环境要求
 
 - 已安装 Docker 与 Docker Compose
 - Bash 或 Zsh shell
 - 已拉取 OpenClaw 项目（执行过 `docker-setup.sh`）
 
-## Development
+## 开发
 
 **使用全新配置测试（模拟首次安装）：**
 
