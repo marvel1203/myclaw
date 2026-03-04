@@ -23,7 +23,7 @@ read_when:
 - 具备 sudo 权限
 - 已准备好模型提供商 API Key（如 OpenAI/Anthropic 等）
 - 飞书应用凭据（`appId`、`appSecret`）
-- 钉钉插件包（npm 包名或本地插件目录）
+- 可用的钉钉插件安装源（推荐 npm 包；或你自己维护的本地插件目录）
 
 ## 1. 非 Docker 部署（推荐）
 
@@ -63,14 +63,15 @@ openclaw logs --follow
 
 ```bash
 openclaw plugins install @openclaw/feishu --pin
-openclaw plugins install <your-dingtalk-plugin-spec> --pin
+openclaw plugins install @your-scope/openclaw-dingtalk --pin
 openclaw plugins list
 ```
 
 说明：
 
 - `@openclaw/feishu` 为飞书插件
-- `<your-dingtalk-plugin-spec>` 可以是钉钉插件的 npm 包名或本地路径（例如 `./extensions/dingtalk`）
+- 钉钉插件通过插件机制安装；上面示例使用 npm 包 `@your-scope/openclaw-dingtalk`
+- 如果你的团队使用本地插件目录分发，可在仓库目录下执行：`openclaw plugins install ./extensions/dingtalk --pin`
 
 ### 1.5 配置飞书与钉钉通道
 
@@ -98,7 +99,7 @@ openclaw channels add
 }
 ```
 
-钉钉通道字段以你安装的钉钉插件 `configSchema`/README 为准。
+钉钉通道字段以你安装的钉钉插件 `configSchema` / README 为准。
 
 ### 1.6 防火墙与访问建议
 
@@ -121,7 +122,7 @@ openclaw logs --follow
 
 ## 2. Docker 部署
 
-## 2.1 安装 Docker Engine 和 Compose 插件
+### 2.1 安装 Docker Engine 和 Compose 插件
 
 ```bash
 sudo dnf -y install dnf-plugins-core
@@ -152,9 +153,11 @@ cd openclaw
 
 ```bash
 docker compose run --rm openclaw-cli plugins install @openclaw/feishu --pin
-docker compose run --rm openclaw-cli plugins install <your-dingtalk-plugin-spec> --pin
+docker compose run --rm openclaw-cli plugins install @your-scope/openclaw-dingtalk --pin
 docker compose run --rm openclaw-cli plugins list
 ```
+
+如果你必须用本地目录安装钉钉插件，需要确保插件目录已通过 volume 映射进入容器，再执行本地路径安装。
 
 ### 2.4 在容器环境配置通道
 
