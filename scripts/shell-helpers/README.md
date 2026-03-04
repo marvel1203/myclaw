@@ -1,50 +1,50 @@
 # ClawDock <!-- omit in toc -->
 
-Stop typing `docker-compose` commands. Just type `clawdock-start`.
+不用再手敲 `docker-compose`，直接执行 `clawdock-start`。
 
-Inspired by Simon Willison's [Running OpenClaw in Docker](https://til.simonwillison.net/llms/openclaw-docker).
+灵感来自 Simon Willison 的 [Running OpenClaw in Docker](https://til.simonwillison.net/llms/openclaw-docker)。
 
-- [Quickstart](#quickstart)
-- [Available Commands](#available-commands)
-  - [Basic Operations](#basic-operations)
-  - [Container Access](#container-access)
-  - [Web UI \& Devices](#web-ui--devices)
-  - [Setup \& Configuration](#setup--configuration)
-  - [Maintenance](#maintenance)
-  - [Utilities](#utilities)
-- [Common Workflows](#common-workflows)
-  - [Check Status and Logs](#check-status-and-logs)
-  - [Set Up WhatsApp Bot](#set-up-whatsapp-bot)
-  - [Troubleshooting Device Pairing](#troubleshooting-device-pairing)
-  - [Fix Token Mismatch Issues](#fix-token-mismatch-issues)
-  - [Permission Denied](#permission-denied)
-- [Requirements](#requirements)
+- [快速开始](#快速开始)
+- [可用命令](#可用命令)
+  - [基础操作](#基础操作)
+  - [容器访问](#容器访问)
+  - [Web UI 与设备](#web-ui-与设备)
+  - [初始化与配置](#初始化与配置)
+  - [维护命令](#维护命令)
+  - [工具命令](#工具命令)
+- [常见工作流](#常见工作流)
+  - [查看状态与日志](#查看状态与日志)
+  - [配置 WhatsApp 机器人](#配置-whatsapp-机器人)
+  - [排查设备配对问题](#排查设备配对问题)
+  - [修复令牌不一致问题](#修复令牌不一致问题)
+  - [权限不足](#权限不足)
+- [环境要求](#环境要求)
 
-## Quickstart
+## 快速开始
 
-**Install:**
+**安装：**
 
 ```bash
-mkdir -p ~/.clawdock && curl -sL https://raw.githubusercontent.com/openclaw/openclaw/main/scripts/shell-helpers/clawdock-helpers.sh -o ~/.clawdock/clawdock-helpers.sh
+mkdir -p ~/.clawdock && curl -sL https://raw.githubusercontent.com/marvel1203/openclaw/main/scripts/shell-helpers/clawdock-helpers.sh -o ~/.clawdock/clawdock-helpers.sh
 ```
 
 ```bash
 echo 'source ~/.clawdock/clawdock-helpers.sh' >> ~/.zshrc && source ~/.zshrc
 ```
 
-**See what you get:**
+**查看可用命令：**
 
 ```bash
 clawdock-help
 ```
 
-On first command, ClawDock auto-detects your OpenClaw directory:
+首次执行命令时，ClawDock 会自动检测 OpenClaw 目录：
 
-- Checks common paths (`~/openclaw`, `~/workspace/openclaw`, etc.)
-- If found, asks you to confirm
-- Saves to `~/.clawdock/config`
+- 检查常见路径（如 `~/openclaw`、`~/workspace/openclaw`）
+- 找到后会让你确认
+- 结果会保存到 `~/.clawdock/config`
 
-**First time setup:**
+**首次配置：**
 
 ```bash
 clawdock-start
@@ -58,162 +58,162 @@ clawdock-fix-token
 clawdock-dashboard
 ```
 
-If you see "pairing required":
+如果看到 “pairing required”：
 
 ```bash
 clawdock-devices
 ```
 
-And approve the request for the specific device:
+然后审批对应设备的请求：
 
 ```bash
 clawdock-approve <request-id>
 ```
 
-## Available Commands
+## 可用命令
 
-### Basic Operations
+### 基础操作
 
-| Command            | Description                     |
-| ------------------ | ------------------------------- |
-| `clawdock-start`   | Start the gateway               |
-| `clawdock-stop`    | Stop the gateway                |
-| `clawdock-restart` | Restart the gateway             |
-| `clawdock-status`  | Check container status          |
-| `clawdock-logs`    | View live logs (follows output) |
+| 命令               | 说明                     |
+| ------------------ | ------------------------ |
+| `clawdock-start`   | 启动 gateway             |
+| `clawdock-stop`    | 停止 gateway             |
+| `clawdock-restart` | 重启 gateway             |
+| `clawdock-status`  | 查看容器状态             |
+| `clawdock-logs`    | 查看实时日志（持续跟随） |
 
-### Container Access
+### 容器访问
 
-| Command                   | Description                                    |
-| ------------------------- | ---------------------------------------------- |
-| `clawdock-shell`          | Interactive shell inside the gateway container |
-| `clawdock-cli <command>`  | Run OpenClaw CLI commands                      |
-| `clawdock-exec <command>` | Execute arbitrary commands in the container    |
+| 命令                      | 说明                        |
+| ------------------------- | --------------------------- |
+| `clawdock-shell`          | 进入 gateway 容器交互 Shell |
+| `clawdock-cli <command>`  | 在容器内执行 OpenClaw CLI   |
+| `clawdock-exec <command>` | 在容器内执行任意命令        |
 
-### Web UI & Devices
+### Web UI 与设备
 
-| Command                 | Description                                |
-| ----------------------- | ------------------------------------------ |
-| `clawdock-dashboard`    | Open web UI in browser with authentication |
-| `clawdock-devices`      | List device pairing requests               |
-| `clawdock-approve <id>` | Approve a device pairing request           |
+| 命令                    | 说明                          |
+| ----------------------- | ----------------------------- |
+| `clawdock-dashboard`    | 在浏览器中打开带认证的 Web UI |
+| `clawdock-devices`      | 列出设备配对请求              |
+| `clawdock-approve <id>` | 审批指定设备配对请求          |
 
-### Setup & Configuration
+### 初始化与配置
 
-| Command              | Description                                       |
-| -------------------- | ------------------------------------------------- |
-| `clawdock-fix-token` | Configure gateway authentication token (run once) |
+| 命令                 | 说明                                    |
+| -------------------- | --------------------------------------- |
+| `clawdock-fix-token` | 配置 gateway 认证 token（一般只需一次） |
 
-### Maintenance
+### 维护命令
 
-| Command            | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `clawdock-rebuild` | Rebuild the Docker image                         |
-| `clawdock-clean`   | Remove all containers and volumes (destructive!) |
+| 命令               | 说明                             |
+| ------------------ | -------------------------------- |
+| `clawdock-rebuild` | 重新构建 Docker 镜像             |
+| `clawdock-clean`   | 删除所有容器与数据卷（危险操作） |
 
-### Utilities
+### 工具命令
 
-| Command              | Description                               |
-| -------------------- | ----------------------------------------- |
-| `clawdock-health`    | Run gateway health check                  |
-| `clawdock-token`     | Display the gateway authentication token  |
-| `clawdock-cd`        | Jump to the OpenClaw project directory    |
-| `clawdock-config`    | Open the OpenClaw config directory        |
-| `clawdock-workspace` | Open the workspace directory              |
-| `clawdock-help`      | Show all available commands with examples |
+| 命令                 | 说明                     |
+| -------------------- | ------------------------ |
+| `clawdock-health`    | 执行 gateway 健康检查    |
+| `clawdock-token`     | 显示 gateway 认证 token  |
+| `clawdock-cd`        | 跳转到 OpenClaw 项目目录 |
+| `clawdock-config`    | 打开 OpenClaw 配置目录   |
+| `clawdock-workspace` | 打开工作目录             |
+| `clawdock-help`      | 显示全部命令和示例       |
 
-## Common Workflows
+## 常见工作流
 
-### Check Status and Logs
+### 查看状态与日志
 
-**Restart the gateway:**
+**重启 gateway：**
 
 ```bash
 clawdock-restart
 ```
 
-**Check container status:**
+**查看容器状态：**
 
 ```bash
 clawdock-status
 ```
 
-**View live logs:**
+**查看实时日志：**
 
 ```bash
 clawdock-logs
 ```
 
-### Set Up WhatsApp Bot
+### 配置 WhatsApp 机器人
 
-**Shell into the container:**
+**进入容器 shell：**
 
 ```bash
 clawdock-shell
 ```
 
-**Inside the container, login to WhatsApp:**
+**在容器内登录 WhatsApp：**
 
 ```bash
 openclaw channels login --channel whatsapp --verbose
 ```
 
-Scan the QR code with WhatsApp on your phone.
+使用手机 WhatsApp 扫描二维码。
 
-**Verify connection:**
+**验证连接：**
 
 ```bash
 openclaw status
 ```
 
-### Troubleshooting Device Pairing
+### 排查设备配对问题
 
-**Check for pending pairing requests:**
+**查看待审批的配对请求：**
 
 ```bash
 clawdock-devices
 ```
 
-**Copy the Request ID from the "Pending" table, then approve:**
+**从 “Pending” 表中复制 Request ID 并审批：**
 
 ```bash
 clawdock-approve <request-id>
 ```
 
-Then refresh your browser.
+然后刷新浏览器。
 
-### Fix Token Mismatch Issues
+### 修复令牌不一致问题
 
-If you see "gateway token mismatch" errors:
+如果你看到 “gateway token mismatch” 错误：
 
 ```bash
 clawdock-fix-token
 ```
 
-This will:
+该命令会：
 
-1. Read the token from your `.env` file
-2. Configure it in the OpenClaw config
-3. Restart the gateway
-4. Verify the configuration
+1. 从 `.env` 读取 token
+2. 写入 OpenClaw 配置
+3. 重启 gateway
+4. 校验配置
 
-### Permission Denied
+### 权限不足
 
-**Ensure Docker is running and you have permission:**
+**先确认 Docker 正在运行且当前用户有权限：**
 
 ```bash
 docker ps
 ```
 
-## Requirements
+## 环境要求
 
-- Docker and Docker Compose installed
-- Bash or Zsh shell
-- OpenClaw project (from `docker-setup.sh`)
+- 已安装 Docker 与 Docker Compose
+- Bash 或 Zsh shell
+- 已拉取 OpenClaw 项目（执行过 `docker-setup.sh`）
 
-## Development
+## 开发
 
-**Test with fresh config (mimics first-time install):**
+**使用全新配置测试（模拟首次安装）：**
 
 ```bash
 unset CLAWDOCK_DIR && rm -f ~/.clawdock/config && source scripts/shell-helpers/clawdock-helpers.sh
