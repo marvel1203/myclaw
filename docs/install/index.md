@@ -143,6 +143,9 @@ For VPS/cloud hosts, avoid third-party "1-click" marketplace images when possibl
 ## Other install methods
 
 <CardGroup cols={2}>
+  <Card title="CentOS 8（飞书 + 钉钉）" href="/install/centos-8-feishu-dingtalk" icon="server">
+    在 CentOS 8 上使用非 Docker 与 Docker 两种方式部署，并接入飞书与钉钉。
+  </Card>
   <Card title="Docker" href="/install/docker" icon="container">
     Containerized or headless deployments.
   </Card>
