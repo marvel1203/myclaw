@@ -1,5 +1,14 @@
 # Repository Guidelines
 
+## Fork Focus (Personal)
+
+- This repository is a personal fork focused on independently shipping custom Claw features; prioritize fast local iteration over maintainer-only release workflows unless explicitly requested.
+- Default contribution path for this fork: implement -> run targeted checks -> commit small scoped changes -> push to fork remote.
+- Prefer changing fork-owned surfaces first (local scripts, docs, extension configs, personal automation) before modifying upstream-wide behavior.
+- Keep upstream compatibility where practical: avoid unnecessary divergence in core CLI/runtime contracts unless the task explicitly requires fork-specific behavior.
+- For coding sessions with the user, commit with regular git commands (`git add`/`git commit`) and keep commits narrowly scoped.
+- When uncertain whether a change should stay fork-only or be upstream-compatible, call it out explicitly in the summary.
+
 - Repo: https://github.com/openclaw/openclaw
 - In chat replies, file references must be repo-root relative only (example: `extensions/bluebubbles/src/channel.ts:80`); never absolute paths or `~/...`.
 - GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
