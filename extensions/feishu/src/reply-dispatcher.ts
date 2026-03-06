@@ -36,6 +36,21 @@ function normalizeEpochMs(timestamp: number | undefined): number | undefined {
   return timestamp < MS_EPOCH_MIN ? timestamp * 1000 : timestamp;
 }
 
+function formatProcessingDuration(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    return "0ms";
+  }
+  if (durationMs < 1000) {
+    return `${Math.round(durationMs)}ms`;
+  }
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s`;
+  }
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.round((durationMs % 60_000) / 1000);
+  return `${minutes}m ${seconds}s`;
+}
+
 export type CreateFeishuReplyDispatcherParams = {
   cfg: ClawdbotConfig;
   agentId: string;
@@ -49,6 +64,7 @@ export type CreateFeishuReplyDispatcherParams = {
   threadReply?: boolean;
   rootId?: string;
   mentionTargets?: MentionTarget[];
+  sessionKey?: string;
   accountId?: string;
   /** Epoch ms when the inbound message was created. Used to suppress typing
    *  indicators on old/replayed messages after context compaction (#30418). */
@@ -74,6 +90,50 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
   const effectiveReplyInThread = threadReplyMode ? true : replyInThread;
   const account = resolveFeishuAccount({ cfg, accountId });
   const prefixContext = createReplyPrefixContext({ cfg, agentId });
+  const dispatcherStartedAt = Date.now();
+  let lifecycleDurationMs: number | null = null;
+
+  const offAgentEvent =
+    params.sessionKey && typeof core.events?.onAgentEvent === "function"
+      ? core.events.onAgentEvent((event) => {
+          if (event.sessionKey !== params.sessionKey || event.stream !== "lifecycle") {
+            return;
+          }
+          const phase = typeof event.data?.phase === "string" ? event.data.phase : "";
+          if (phase !== "end" && phase !== "error") {
+            return;
+          }
+          const startedAt =
+            typeof event.data?.startedAt === "number" && Number.isFinite(event.data.startedAt)
+              ? event.data.startedAt
+              : null;
+          const endedAt =
+            typeof event.data?.endedAt === "number" && Number.isFinite(event.data.endedAt)
+              ? event.data.endedAt
+              : event.ts;
+          if (startedAt === null || !Number.isFinite(endedAt)) {
+            return;
+          }
+          lifecycleDurationMs = Math.max(0, endedAt - startedAt);
+        })
+      : null;
+
+  const resolveProcessingDuration = () => {
+    if (typeof lifecycleDurationMs === "number" && Number.isFinite(lifecycleDurationMs)) {
+      return Math.max(0, lifecycleDurationMs);
+    }
+    return Math.max(0, Date.now() - dispatcherStartedAt);
+  };
+
+  const withProcessingFooter = (text: string, info?: { kind?: string }) => {
+    if (info?.kind !== "final") {
+      return text;
+    }
+    if (!text.trim() || /(Processing time|处理耗时)\s*[:：]\s*[^\n]+$/i.test(text.trim())) {
+      return text;
+    }
+    return `${text}\n\n处理耗时：${formatProcessingDuration(resolveProcessingDuration())}`;
+  };
 
   let typingState: TypingIndicatorState | null = null;
   const typingCallbacks = createTypingCallbacks({
@@ -247,7 +307,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         void typingCallbacks.onReplyStart?.();
       },
       deliver: async (payload: ReplyPayload, info) => {
-        const text = payload.text ?? "";
+        const text = withProcessingFooter(payload.text ?? "", info);
         const mediaList =
           payload.mediaUrls && payload.mediaUrls.length > 0
             ? payload.mediaUrls
@@ -373,6 +433,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         typingCallbacks.onIdle?.();
       },
       onCleanup: () => {
+        offAgentEvent?.();
         typingCallbacks.onCleanup?.();
       },
     });

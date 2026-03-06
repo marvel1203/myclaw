@@ -28,6 +28,8 @@ export type ToolStreamEntry = {
 type ToolStreamHost = {
   sessionKey: string;
   chatRunId: string | null;
+  chatStreamStartedAt?: number | null;
+  chatLastDurationMs?: number | null;
   toolStreamById: Map<string, ToolStreamEntry>;
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
@@ -382,6 +384,47 @@ function handleLifecycleFallbackEvent(host: CompactionHost, payload: AgentEventP
   }, FALLBACK_TOAST_DURATION_MS);
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function handleLifecycleDurationEvent(host: ToolStreamHost, payload: AgentEventPayload) {
+  if (payload.stream !== "lifecycle") {
+    return;
+  }
+  const data = payload.data ?? {};
+  const phase = toTrimmedString(data.phase);
+  if (!phase || (phase !== "start" && phase !== "end" && phase !== "error")) {
+    return;
+  }
+
+  const accepted = resolveAcceptedSession(host, payload, { allowSessionScopedWhenIdle: true });
+  if (!accepted.accepted) {
+    return;
+  }
+
+  const startedAt = toFiniteNumber(data.startedAt);
+  const endedAt = toFiniteNumber(data.endedAt);
+  if (phase === "start") {
+    if (startedAt !== null) {
+      host.chatStreamStartedAt = startedAt;
+    }
+    return;
+  }
+
+  const fallbackStart = toFiniteNumber(host.chatStreamStartedAt);
+  const terminalTs = endedAt ?? toFiniteNumber(payload.ts) ?? Date.now();
+  const start = startedAt ?? fallbackStart;
+  if (start === null) {
+    return;
+  }
+
+  host.chatLastDurationMs = Math.max(0, terminalTs - start);
+}
+
 export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPayload) {
   if (!payload) {
     return;
@@ -394,6 +437,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   }
 
   if (payload.stream === "lifecycle" || payload.stream === "fallback") {
+    handleLifecycleDurationEvent(host, payload);
     handleLifecycleFallbackEvent(host as CompactionHost, payload);
     return;
   }

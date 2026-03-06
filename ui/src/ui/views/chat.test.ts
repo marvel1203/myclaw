@@ -224,4 +224,27 @@ describe("chat view", () => {
     expect(onNewSession).toHaveBeenCalledTimes(1);
     expect(container.textContent).not.toContain("Stop");
   });
+
+  it("renders assistant processing duration in grouped footer", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          messages: [
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "Done" }],
+              timestamp: 100,
+              __openclaw: { durationMs: 2450 },
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    const duration = container.querySelector(".chat-group-duration");
+    expect(duration).not.toBeNull();
+    expect(duration?.textContent).toContain("2.5s");
+  });
 });

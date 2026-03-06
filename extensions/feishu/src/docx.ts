@@ -99,6 +99,10 @@ function cleanBlocksForInsert(blocks: any[]): { cleaned: any[]; skipped: string[
 /** Max blocks per documentBlockChildren.create request */
 const MAX_BLOCKS_PER_INSERT = 50;
 const MAX_CONVERT_RETRY_DEPTH = 8;
+const WRITE_RETRY_ATTEMPTS = 3;
+const WRITE_RETRY_BASE_DELAY_MS = 300;
+const POST_WRITE_VERIFY_ATTEMPTS = 3;
+const POST_WRITE_VERIFY_DELAY_MS = 200;
 
 async function convertMarkdown(client: Lark.Client, markdown: string) {
   const res = await client.docx.document.convert({
@@ -352,6 +356,74 @@ async function clearDocumentContent(client: Lark.Client, docToken: string) {
 
   return childIds.length;
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- SDK block types */
+function getTopLevelContentBlockIds(docToken: string, blocks: any[]): string[] {
+  return blocks
+    .filter((b) => b.parent_id === docToken && b.block_type !== 1)
+    .map((b) => b.block_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+async function listDocumentBlocks(client: Lark.Client, docToken: string): Promise<any[]> {
+  const res = await client.docx.documentBlock.list({
+    path: { document_id: docToken },
+  });
+  if (res.code !== 0) {
+    throw new Error(res.msg);
+  }
+  return res.data?.items ?? [];
+}
+
+async function captureDocumentSnapshot(
+  client: Lark.Client,
+  docToken: string,
+): Promise<{
+  blocks: any[];
+  firstLevelBlockIds: string[];
+}> {
+  const items = await listDocumentBlocks(client, docToken);
+  const firstLevelBlockIds = getTopLevelContentBlockIds(docToken, items);
+  const snapshotBlocks = items.filter((b) => b.block_type !== 1);
+  return { blocks: snapshotBlocks, firstLevelBlockIds };
+}
+
+async function restoreDocumentSnapshot(
+  client: Lark.Client,
+  docToken: string,
+  snapshot: { blocks: any[]; firstLevelBlockIds: string[] },
+  logger?: Logger,
+) {
+  if (!snapshot.firstLevelBlockIds.length || !snapshot.blocks.length) {
+    return;
+  }
+  logger?.info?.(
+    `feishu_doc: write failed, restoring previous content (${snapshot.firstLevelBlockIds.length} top-level blocks)...`,
+  );
+  await insertBlocksWithDescendant(client, docToken, snapshot.blocks, snapshot.firstLevelBlockIds);
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function hasTopLevelContent(client: Lark.Client, docToken: string) {
+  const items = await listDocumentBlocks(client, docToken);
+  return getTopLevelContentBlockIds(docToken, items).length > 0;
+}
+
+async function verifyDocumentHasContent(client: Lark.Client, docToken: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= POST_WRITE_VERIFY_ATTEMPTS; attempt++) {
+    if (await hasTopLevelContent(client, docToken)) {
+      return true;
+    }
+    if (attempt < POST_WRITE_VERIFY_ATTEMPTS) {
+      await sleep(POST_WRITE_VERIFY_DELAY_MS * attempt);
+    }
+  }
+  return false;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any -- SDK block types */
 
 async function uploadImageToDocx(
   client: Lark.Client,
@@ -816,28 +888,63 @@ async function writeDoc(
   maxBytes: number,
   logger?: Logger,
 ) {
-  const deleted = await clearDocumentContent(client, docToken);
   logger?.info?.("feishu_doc: Converting markdown...");
   const { blocks, firstLevelBlockIds } = await chunkedConvertMarkdown(client, markdown);
+
+  // Important safety guard: do not clear existing content before conversion succeeds.
+  // This prevents conversion failures from leaving an empty document.
+  const snapshot = await captureDocumentSnapshot(client, docToken);
+  const deleted = snapshot.firstLevelBlockIds.length;
+
   if (blocks.length === 0) {
+    await clearDocumentContent(client, docToken);
     return { success: true, blocks_deleted: deleted, blocks_added: 0, images_processed: 0 };
   }
 
   logger?.info?.(`feishu_doc: Converted to ${blocks.length} blocks, inserting...`);
   const sortedBlocks = sortBlocksByFirstLevel(blocks, firstLevelBlockIds);
-  const { children: inserted } =
-    blocks.length > BATCH_SIZE
-      ? await insertBlocksInBatches(client, docToken, sortedBlocks, firstLevelBlockIds, logger)
-      : await insertBlocksWithDescendant(client, docToken, sortedBlocks, firstLevelBlockIds);
-  const imagesProcessed = await processImages(client, docToken, markdown, inserted, maxBytes);
-  logger?.info?.(`feishu_doc: Done (${blocks.length} blocks, ${imagesProcessed} images)`);
+  await clearDocumentContent(client, docToken);
 
-  return {
-    success: true,
-    blocks_deleted: deleted,
-    blocks_added: blocks.length,
-    images_processed: imagesProcessed,
-  };
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= WRITE_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const { children: inserted } =
+        blocks.length > BATCH_SIZE
+          ? await insertBlocksInBatches(client, docToken, sortedBlocks, firstLevelBlockIds, logger)
+          : await insertBlocksWithDescendant(client, docToken, sortedBlocks, firstLevelBlockIds);
+      const imagesProcessed = await processImages(client, docToken, markdown, inserted, maxBytes);
+
+      if (!(await verifyDocumentHasContent(client, docToken))) {
+        throw new Error("write verification failed: document has no top-level content");
+      }
+
+      logger?.info?.(`feishu_doc: Done (${blocks.length} blocks, ${imagesProcessed} images)`);
+      return {
+        success: true,
+        blocks_deleted: deleted,
+        blocks_added: blocks.length,
+        images_processed: imagesProcessed,
+      };
+    } catch (error) {
+      lastError = error;
+      logger?.info?.(
+        `feishu_doc: write attempt ${attempt}/${WRITE_RETRY_ATTEMPTS} failed: ${String(error)}`,
+      );
+      if (attempt < WRITE_RETRY_ATTEMPTS) {
+        await clearDocumentContent(client, docToken);
+        await sleep(WRITE_RETRY_BASE_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  // Last-resort rollback: restore previous content to avoid leaving an empty doc.
+  try {
+    await restoreDocumentSnapshot(client, docToken, snapshot, logger);
+  } catch (rollbackError) {
+    logger?.info?.(`feishu_doc: rollback failed after write failure: ${String(rollbackError)}`);
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function appendDoc(
