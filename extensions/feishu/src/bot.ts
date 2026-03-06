@@ -1394,6 +1394,7 @@ export async function handleFeishuMessage(params: {
             rootId: ctx.rootId,
             threadReply,
             mentionTargets: ctx.mentionTargets,
+            sessionKey: agentSessionKey,
             accountId: account.accountId,
             messageCreateTimeMs,
           });
@@ -1492,6 +1493,7 @@ export async function handleFeishuMessage(params: {
         rootId: ctx.rootId,
         threadReply,
         mentionTargets: ctx.mentionTargets,
+        sessionKey: route.sessionKey,
         accountId: account.accountId,
         messageCreateTimeMs,
       });

@@ -11,6 +11,7 @@ const createReplyDispatcherWithTypingMock = vi.hoisted(() => vi.fn());
 const addTypingIndicatorMock = vi.hoisted(() => vi.fn(async () => ({ messageId: "om_msg" })));
 const removeTypingIndicatorMock = vi.hoisted(() => vi.fn(async () => {}));
 const streamingInstances = vi.hoisted(() => [] as any[]);
+const onAgentEventMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./accounts.js", () => ({ resolveFeishuAccount: resolveFeishuAccountMock }));
 vi.mock("./runtime.js", () => ({ getFeishuRuntime: getFeishuRuntimeMock }));
@@ -73,6 +74,9 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
     }));
 
     getFeishuRuntimeMock.mockReturnValue({
+      events: {
+        onAgentEvent: onAgentEventMock,
+      },
       channel: {
         text: {
           resolveTextChunkLimit: vi.fn(() => 4000),
@@ -428,6 +432,42 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
       expect.objectContaining({
         replyToMessageId: "om_msg",
         replyInThread: true,
+      }),
+    );
+  });
+
+  it("appends processing-time footer from lifecycle events", async () => {
+    let lifecycleListener: ((event: Record<string, unknown>) => void) | null = null;
+    onAgentEventMock.mockImplementation((listener: (event: Record<string, unknown>) => void) => {
+      lifecycleListener = listener;
+      return vi.fn();
+    });
+
+    createFeishuReplyDispatcher({
+      cfg: {} as never,
+      agentId: "agent",
+      runtime: {} as never,
+      chatId: "oc_chat",
+      sessionKey: "main",
+    });
+
+    lifecycleListener?.({
+      sessionKey: "main",
+      stream: "lifecycle",
+      ts: 1200,
+      data: {
+        phase: "end",
+        startedAt: 1000,
+        endedAt: 1800,
+      },
+    });
+
+    const options = createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
+    await options.deliver({ text: "answer" }, { kind: "final" });
+
+    expect(sendMessageFeishuMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining("处理耗时：800ms"),
       }),
     );
   });

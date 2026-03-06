@@ -39,6 +39,7 @@ export type ChatState = {
   chatRunId: string | null;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
+  chatLastDurationMs: number | null;
   lastError: string | null;
 };
 
@@ -49,6 +50,33 @@ export type ChatEventPayload = {
   message?: unknown;
   errorMessage?: string;
 };
+
+function resolveRunDurationMs(state: ChatState): number | null {
+  if (typeof state.chatLastDurationMs === "number" && Number.isFinite(state.chatLastDurationMs)) {
+    return Math.max(0, state.chatLastDurationMs);
+  }
+  if (typeof state.chatStreamStartedAt === "number" && Number.isFinite(state.chatStreamStartedAt)) {
+    return Math.max(0, Date.now() - state.chatStreamStartedAt);
+  }
+  return null;
+}
+
+function withDurationMetadata(message: Record<string, unknown>, durationMs: number | null) {
+  if (durationMs === null) {
+    return message;
+  }
+  const marker =
+    message.__openclaw && typeof message.__openclaw === "object"
+      ? (message.__openclaw as Record<string, unknown>)
+      : {};
+  return {
+    ...message,
+    __openclaw: {
+      ...marker,
+      durationMs,
+    },
+  };
+}
 
 export async function loadChatHistory(state: ChatState) {
   if (!state.client || !state.connected) {
@@ -173,6 +201,7 @@ export async function sendChatMessage(
 
   state.chatSending = true;
   state.lastError = null;
+  state.chatLastDurationMs = null;
   const runId = generateUUID();
   state.chatRunId = runId;
   state.chatStream = "";
@@ -272,46 +301,63 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
+    const runDurationMs = resolveRunDurationMs(state);
     const finalMessage = normalizeFinalAssistantMessage(payload.message);
     if (finalMessage && !isAssistantSilentReply(finalMessage)) {
-      state.chatMessages = [...state.chatMessages, finalMessage];
+      state.chatMessages = [
+        ...state.chatMessages,
+        withDurationMetadata(finalMessage, runDurationMs),
+      ];
     } else if (state.chatStream?.trim() && !isSilentReplyStream(state.chatStream)) {
       state.chatMessages = [
         ...state.chatMessages,
-        {
-          role: "assistant",
-          content: [{ type: "text", text: state.chatStream }],
-          timestamp: Date.now(),
-        },
+        withDurationMetadata(
+          {
+            role: "assistant",
+            content: [{ type: "text", text: state.chatStream }],
+            timestamp: Date.now(),
+          },
+          runDurationMs,
+        ),
       ];
     }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatLastDurationMs = null;
   } else if (payload.state === "aborted") {
+    const runDurationMs = resolveRunDurationMs(state);
     const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
     if (normalizedMessage && !isAssistantSilentReply(normalizedMessage)) {
-      state.chatMessages = [...state.chatMessages, normalizedMessage];
+      state.chatMessages = [
+        ...state.chatMessages,
+        withDurationMetadata(normalizedMessage, runDurationMs),
+      ];
     } else {
       const streamedText = state.chatStream ?? "";
       if (streamedText.trim() && !isSilentReplyStream(streamedText)) {
         state.chatMessages = [
           ...state.chatMessages,
-          {
-            role: "assistant",
-            content: [{ type: "text", text: streamedText }],
-            timestamp: Date.now(),
-          },
+          withDurationMetadata(
+            {
+              role: "assistant",
+              content: [{ type: "text", text: streamedText }],
+              timestamp: Date.now(),
+            },
+            runDurationMs,
+          ),
         ];
       }
     }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatLastDurationMs = null;
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatLastDurationMs = null;
     state.lastError = payload.errorMessage ?? "chat error";
   }
   return payload.state;

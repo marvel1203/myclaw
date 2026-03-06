@@ -1007,6 +1007,7 @@ export function renderApp(state: AppViewState) {
                   state.chatAttachments = [];
                   state.chatStream = null;
                   state.chatStreamStartedAt = null;
+                  state.chatLastDurationMs = null;
                   state.chatRunId = null;
                   state.chatQueue = [];
                   state.resetToolStream();

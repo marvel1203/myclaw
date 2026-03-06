@@ -300,6 +300,66 @@ describe("feishu_doc image fetch hardening", () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it("does not clear existing document when markdown convert fails", async () => {
+    convertMock.mockResolvedValueOnce({
+      code: 999,
+      msg: "convert failed",
+    });
+
+    const feishuDocTool = resolveFeishuDocTool();
+    const result = await feishuDocTool.execute("tool-call", {
+      action: "write",
+      doc_token: "doc_1",
+      content: "# broken",
+    });
+
+    expect(result.details.error).toContain("convert failed");
+    expect(blockChildrenBatchDeleteMock).not.toHaveBeenCalled();
+    expect(blockDescendantCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("tries rollback when write retries are exhausted", async () => {
+    convertMock.mockResolvedValue({
+      code: 0,
+      data: {
+        blocks: [{ block_type: 2, block_id: "new_1" }],
+        first_level_block_ids: ["new_1"],
+      },
+    });
+
+    const oldDocBlocks = [
+      {
+        block_id: "old_1",
+        parent_id: "doc_1",
+        block_type: 2,
+      },
+    ];
+
+    blockListMock
+      .mockResolvedValueOnce({ code: 0, data: { items: oldDocBlocks } })
+      .mockResolvedValueOnce({ code: 0, data: { items: oldDocBlocks } })
+      .mockResolvedValue({ code: 0, data: { items: [] } });
+
+    let descendantInsertCalls = 0;
+    blockDescendantCreateMock.mockImplementation(async () => {
+      descendantInsertCalls++;
+      if (descendantInsertCalls <= 3) {
+        return { code: 999, msg: "insert failed" };
+      }
+      return { code: 0, data: { children: [{ block_id: "old_1", block_type: 2 }] } };
+    });
+
+    const feishuDocTool = resolveFeishuDocTool();
+    const result = await feishuDocTool.execute("tool-call", {
+      action: "write",
+      doc_token: "doc_1",
+      content: "new content",
+    });
+
+    expect(result.details.error).toContain("insert failed");
+    expect(descendantInsertCalls).toBe(4);
+  });
+
   it("create grants permission only to trusted Feishu requester", async () => {
     const feishuDocTool = resolveFeishuDocTool({
       messageChannel: "feishu",
