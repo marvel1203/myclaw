@@ -31,6 +31,11 @@ export const getHandshakeTimeoutMs = () => {
   return DEFAULT_HANDSHAKE_TIMEOUT_MS;
 };
 export const TICK_INTERVAL_MS = 30_000;
-export const HEALTH_REFRESH_INTERVAL_MS = 60_000;
+// Periodic health probe interval: 2 min (120 s) reduces active channel probing overhead
+// while still keeping the cached snapshot reasonably fresh.
+export const HEALTH_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 120 000 ms
 export const DEDUPE_TTL_MS = 5 * 60_000;
 export const DEDUPE_MAX = 1000;
+// Run maintenance cleanup every 2 min (120 s); dedupe TTL is 5 min so entries
+// never outlive their TTL by more than one cleanup cycle.
+export const DEDUPE_CLEANUP_INTERVAL_MS = 2 * 60 * 1000; // 120 000 ms
