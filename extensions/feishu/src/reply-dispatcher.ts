@@ -36,6 +36,20 @@ function normalizeEpochMs(timestamp: number | undefined): number | undefined {
   return timestamp < MS_EPOCH_MIN ? timestamp * 1000 : timestamp;
 }
 
+function formatTokenCount(count: number): string {
+  if (!Number.isFinite(count) || count < 0) {
+    return "0";
+  }
+  const safe = Math.max(0, count);
+  if (safe >= 1_000_000) {
+    return `${(safe / 1_000_000).toFixed(1)}m`;
+  }
+  if (safe >= 1_000) {
+    return `${(safe / 1_000).toFixed(safe >= 10_000 ? 0 : 1)}k`;
+  }
+  return String(Math.round(safe));
+}
+
 function formatProcessingDuration(durationMs: number): string {
   if (!Number.isFinite(durationMs) || durationMs < 0) {
     return "0ms";
@@ -92,6 +106,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
   const prefixContext = createReplyPrefixContext({ cfg, agentId });
   const dispatcherStartedAt = Date.now();
   let lifecycleDurationMs: number | null = null;
+  let tokenUsage: { input: number; output: number; total: number } | null = null;
 
   const offAgentEvent =
     params.sessionKey && typeof core.events?.onAgentEvent === "function"
@@ -100,6 +115,27 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
             return;
           }
           const phase = typeof event.data?.phase === "string" ? event.data.phase : "";
+          if (phase === "usage") {
+            const inputTokens =
+              typeof event.data?.inputTokens === "number" && Number.isFinite(event.data.inputTokens)
+                ? event.data.inputTokens
+                : 0;
+            const outputTokens =
+              typeof event.data?.outputTokens === "number" &&
+              Number.isFinite(event.data.outputTokens)
+                ? event.data.outputTokens
+                : 0;
+            const totalTokens =
+              typeof event.data?.totalTokens === "number" &&
+              Number.isFinite(event.data.totalTokens) &&
+              (event.data.totalTokens as number) > 0
+                ? (event.data.totalTokens as number)
+                : inputTokens + outputTokens;
+            if (totalTokens > 0) {
+              tokenUsage = { input: inputTokens, output: outputTokens, total: totalTokens };
+            }
+            return;
+          }
           if (phase !== "end" && phase !== "error") {
             return;
           }
@@ -132,7 +168,14 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
     if (!text.trim() || /(Processing time|处理耗时)\s*[:：]\s*[^\n]+$/i.test(text.trim())) {
       return text;
     }
-    return `${text}\n\n处理耗时：${formatProcessingDuration(resolveProcessingDuration())}`;
+    let footer = `处理耗时：${formatProcessingDuration(resolveProcessingDuration())}`;
+    if (tokenUsage) {
+      const inputStr = formatTokenCount(tokenUsage.input);
+      const outputStr = formatTokenCount(tokenUsage.output);
+      const totalStr = formatTokenCount(tokenUsage.total);
+      footer += `，消耗 token：${totalStr} (输入 ${inputStr} / 输出 ${outputStr})`;
+    }
+    return `${text}\n\n${footer}`;
   };
 
   let typingState: TypingIndicatorState | null = null;
