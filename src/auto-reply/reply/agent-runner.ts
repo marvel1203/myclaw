@@ -564,6 +564,20 @@ export async function runReplyAgent(params: {
       });
     }
 
+    if (sessionKey && hasNonzeroUsage(usage)) {
+      emitAgentEvent({
+        runId,
+        sessionKey,
+        stream: "lifecycle",
+        data: {
+          phase: "usage",
+          inputTokens: usage.input ?? 0,
+          outputTokens: usage.output ?? 0,
+          totalTokens: usage.total ?? (usage.input ?? 0) + (usage.output ?? 0),
+        },
+      });
+    }
+
     const responseUsageRaw =
       activeSessionEntry?.responseUsage ??
       (sessionKey ? activeSessionStore?.[sessionKey]?.responseUsage : undefined);

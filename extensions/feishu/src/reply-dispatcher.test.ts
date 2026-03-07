@@ -471,4 +471,86 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
       }),
     );
   });
+
+  it("appends token usage to footer from lifecycle usage event", async () => {
+    let lifecycleListener: ((event: Record<string, unknown>) => void) | null = null;
+    onAgentEventMock.mockImplementation((listener: (event: Record<string, unknown>) => void) => {
+      lifecycleListener = listener;
+      return vi.fn();
+    });
+
+    createFeishuReplyDispatcher({
+      cfg: {} as never,
+      agentId: "agent",
+      runtime: {} as never,
+      chatId: "oc_chat",
+      sessionKey: "main",
+    });
+
+    lifecycleListener?.({
+      sessionKey: "main",
+      stream: "lifecycle",
+      ts: 1200,
+      data: {
+        phase: "end",
+        startedAt: 1000,
+        endedAt: 1800,
+      },
+    });
+
+    lifecycleListener?.({
+      sessionKey: "main",
+      stream: "lifecycle",
+      ts: 1300,
+      data: {
+        phase: "usage",
+        inputTokens: 800,
+        outputTokens: 200,
+        totalTokens: 1000,
+      },
+    });
+
+    const options = createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
+    await options.deliver({ text: "answer" }, { kind: "final" });
+
+    const calledWith = sendMessageFeishuMock.mock.calls[0]?.[0];
+    expect(calledWith?.text).toContain("处理耗时：800ms");
+    expect(calledWith?.text).toContain("消耗 token：1.0k");
+    expect(calledWith?.text).toContain("输入 800");
+    expect(calledWith?.text).toContain("输出 200");
+  });
+
+  it("omits token usage from footer when no usage event is received", async () => {
+    let lifecycleListener: ((event: Record<string, unknown>) => void) | null = null;
+    onAgentEventMock.mockImplementation((listener: (event: Record<string, unknown>) => void) => {
+      lifecycleListener = listener;
+      return vi.fn();
+    });
+
+    createFeishuReplyDispatcher({
+      cfg: {} as never,
+      agentId: "agent",
+      runtime: {} as never,
+      chatId: "oc_chat",
+      sessionKey: "main",
+    });
+
+    lifecycleListener?.({
+      sessionKey: "main",
+      stream: "lifecycle",
+      ts: 1200,
+      data: {
+        phase: "end",
+        startedAt: 1000,
+        endedAt: 1800,
+      },
+    });
+
+    const options = createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
+    await options.deliver({ text: "answer" }, { kind: "final" });
+
+    const calledWith = sendMessageFeishuMock.mock.calls[0]?.[0];
+    expect(calledWith?.text).toContain("处理耗时：800ms");
+    expect(calledWith?.text).not.toContain("消耗 token");
+  });
 });
