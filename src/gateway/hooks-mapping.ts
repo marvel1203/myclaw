@@ -80,6 +80,8 @@ const hookPresetMappings: Record<string, HookMappingConfig[]> = {
 };
 
 const transformCache = new Map<string, HookTransformFn>();
+// Prevent unbounded growth: evict the oldest entry when the cache exceeds this size.
+const TRANSFORM_CACHE_MAX = 50;
 
 type HookTransformResult = Partial<{
   kind: HookAction["kind"];
@@ -333,6 +335,14 @@ async function loadTransform(transform: HookMappingTransformResolved): Promise<H
   }
   const mod = await importFileModule({ modulePath: transform.modulePath });
   const fn = resolveTransformFn(mod, transform.exportName);
+  // Only evict when inserting a new key so we don't discard an unrelated entry
+  // when re-loading an already-cached transform (size would not grow anyway).
+  if (!transformCache.has(cacheKey) && transformCache.size >= TRANSFORM_CACHE_MAX) {
+    const oldestKey = transformCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      transformCache.delete(oldestKey);
+    }
+  }
   transformCache.set(cacheKey, fn);
   return fn;
 }

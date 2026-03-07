@@ -2,6 +2,7 @@ import type { HealthSummary } from "../commands/health.js";
 import { abortChatRunById, type ChatAbortControllerEntry } from "./chat-abort.js";
 import type { ChatRunEntry } from "./server-chat.js";
 import {
+  DEDUPE_CLEANUP_INTERVAL_MS,
   DEDUPE_MAX,
   DEDUPE_TTL_MS,
   HEALTH_REFRESH_INTERVAL_MS,
@@ -58,6 +59,8 @@ export function startGatewayMaintenanceTimers(params: {
     params.broadcast("tick", payload, { dropIfSlow: true });
     params.nodeSendToAllSubscribed("tick", payload);
   }, TICK_INTERVAL_MS);
+  // Allow the process to exit naturally when only maintenance timers remain.
+  tickInterval.unref();
 
   // periodic health refresh to keep cached snapshot warm
   const healthInterval = setInterval(() => {
@@ -65,6 +68,7 @@ export function startGatewayMaintenanceTimers(params: {
       .refreshGatewayHealthSnapshot({ probe: true })
       .catch((err) => params.logHealth.error(`refresh failed: ${formatError(err)}`));
   }, HEALTH_REFRESH_INTERVAL_MS);
+  healthInterval.unref();
 
   // Prime cache so first client gets a snapshot without waiting.
   void params
@@ -127,7 +131,8 @@ export function startGatewayMaintenanceTimers(params: {
       params.chatRunBuffers.delete(runId);
       params.chatDeltaSentAt.delete(runId);
     }
-  }, 60_000);
+  }, DEDUPE_CLEANUP_INTERVAL_MS);
+  dedupeCleanup.unref();
 
   return { tickInterval, healthInterval, dedupeCleanup };
 }

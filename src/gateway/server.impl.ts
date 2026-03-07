@@ -639,7 +639,12 @@ export async function startGatewayServer(
         }, skillsRefreshDelayMs);
       });
 
-  const noopInterval = () => setInterval(() => {}, 1 << 30);
+  const noopInterval = () => {
+    const t = setInterval(() => {}, 1 << 30);
+    // Do not keep the event loop alive when only noop placeholders remain.
+    t.unref();
+    return t;
+  };
   let tickInterval = noopInterval();
   let healthInterval = noopInterval();
   let dedupeCleanup = noopInterval();
