@@ -26,6 +26,7 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
     fallbackStatus: null,
     messages: [],
     toolMessages: [],
+    streamSegments: [],
     stream: null,
     streamStartedAt: null,
     assistantAvatarUrl: null,
@@ -225,17 +226,17 @@ describe("chat view", () => {
     expect(container.textContent).not.toContain("Stop");
   });
 
-  it("renders assistant processing duration in grouped footer", () => {
+  it("shows sender labels from sanitized gateway messages instead of generic You", () => {
     const container = document.createElement("div");
     render(
       renderChat(
         createProps({
           messages: [
             {
-              role: "assistant",
-              content: [{ type: "text", text: "Done" }],
-              timestamp: 100,
-              __openclaw: { durationMs: 2450 },
+              role: "user",
+              content: "hello from topic",
+              senderLabel: "Iris",
+              timestamp: 1000,
             },
           ],
         }),
@@ -243,8 +244,43 @@ describe("chat view", () => {
       container,
     );
 
-    const duration = container.querySelector(".chat-group-duration");
-    expect(duration).not.toBeNull();
-    expect(duration?.textContent).toContain("2.5s");
+    const senderLabels = Array.from(container.querySelectorAll(".chat-sender-name")).map((node) =>
+      node.textContent?.trim(),
+    );
+    expect(senderLabels).toContain("Iris");
+    expect(senderLabels).not.toContain("You");
+  });
+
+  it("keeps consecutive user messages from different senders in separate groups", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          messages: [
+            {
+              role: "user",
+              content: "first",
+              senderLabel: "Iris",
+              timestamp: 1000,
+            },
+            {
+              role: "user",
+              content: "second",
+              senderLabel: "Joaquin De Rojas",
+              timestamp: 1001,
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    const groups = container.querySelectorAll(".chat-group.user");
+    expect(groups).toHaveLength(2);
+    const senderLabels = Array.from(container.querySelectorAll(".chat-sender-name")).map((node) =>
+      node.textContent?.trim(),
+    );
+    expect(senderLabels).toContain("Iris");
+    expect(senderLabels).toContain("Joaquin De Rojas");
   });
 });

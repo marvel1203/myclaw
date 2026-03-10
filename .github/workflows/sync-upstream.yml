@@ -26,5 +26,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git remote add upstream https://github.com/openclaw/openclaw.git || true
           git fetch upstream main
-          git merge --ff-only upstream/main || git merge --no-edit upstream/main
+          git merge --ff-only upstream/main || git merge --no-edit -X theirs upstream/main
           git push origin main

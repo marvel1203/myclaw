@@ -7,14 +7,15 @@ type MutableHost = ToolStreamHost & {
   compactionClearTimer?: number | null;
   fallbackStatus?: FallbackStatus | null;
   fallbackClearTimer?: number | null;
-  chatStreamStartedAt?: number | null;
-  chatLastDurationMs?: number | null;
 };
 
 function createHost(overrides?: Partial<MutableHost>): MutableHost {
   return {
     sessionKey: "main",
     chatRunId: null,
+    chatStream: null,
+    chatStreamStartedAt: null,
+    chatStreamSegments: [],
     toolStreamById: new Map<string, ToolStreamEntry>(),
     toolStreamOrder: [],
     chatToolMessages: [],
@@ -23,8 +24,6 @@ function createHost(overrides?: Partial<MutableHost>): MutableHost {
     compactionClearTimer: null,
     fallbackStatus: null,
     fallbackClearTimer: null,
-    chatStreamStartedAt: null,
-    chatLastDurationMs: null,
     ...overrides,
   };
 }
@@ -139,24 +138,5 @@ describe("app-tool-stream fallback lifecycle handling", () => {
     expect(host.fallbackStatus?.phase).toBe("cleared");
     expect(host.fallbackStatus?.previous).toBe("deepinfra/moonshotai/Kimi-K2.5");
     vi.useRealTimers();
-  });
-
-  it("captures lifecycle duration on end", () => {
-    const host = createHost({ chatRunId: "run-1", chatStreamStartedAt: 1000 });
-
-    handleAgentEvent(host, {
-      runId: "run-1",
-      seq: 2,
-      stream: "lifecycle",
-      ts: 2600,
-      sessionKey: "main",
-      data: {
-        phase: "end",
-        startedAt: 1000,
-        endedAt: 2500,
-      },
-    });
-
-    expect(host.chatLastDurationMs).toBe(1500);
   });
 });

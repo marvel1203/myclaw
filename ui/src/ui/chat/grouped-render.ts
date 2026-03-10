@@ -116,9 +116,10 @@ export function renderMessageGroup(
 ) {
   const normalizedRole = normalizeRoleForGrouping(group.role);
   const assistantName = opts.assistantName ?? "Assistant";
+  const userLabel = group.senderLabel?.trim();
   const who =
     normalizedRole === "user"
-      ? "You"
+      ? (userLabel ?? "You")
       : normalizedRole === "assistant"
         ? assistantName
         : normalizedRole;
@@ -128,9 +129,6 @@ export function renderMessageGroup(
     hour: "numeric",
     minute: "2-digit",
   });
-  const lastMessage = group.messages[group.messages.length - 1]?.message;
-  const processingDurationMs =
-    normalizedRole === "assistant" && lastMessage ? extractDurationMs(lastMessage) : null;
 
   return html`
     <div class="chat-group ${roleClass}">
@@ -152,44 +150,10 @@ export function renderMessageGroup(
         <div class="chat-group-footer">
           <span class="chat-sender-name">${who}</span>
           <span class="chat-group-timestamp">${timestamp}</span>
-          ${
-            processingDurationMs !== null
-              ? html`<span class="chat-group-duration" title="Model processing duration">
-                ${formatDurationLabel(processingDurationMs)}
-              </span>`
-              : nothing
-          }
         </div>
       </div>
     </div>
   `;
-}
-
-function extractDurationMs(message: unknown): number | null {
-  if (!message || typeof message !== "object") {
-    return null;
-  }
-  const marker = (message as Record<string, unknown>).__openclaw;
-  if (!marker || typeof marker !== "object") {
-    return null;
-  }
-  const durationMs = (marker as Record<string, unknown>).durationMs;
-  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
-    return null;
-  }
-  return Math.max(0, durationMs);
-}
-
-function formatDurationLabel(durationMs: number): string {
-  if (durationMs < 1000) {
-    return `${Math.round(durationMs)}ms`;
-  }
-  if (durationMs < 60_000) {
-    return `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s`;
-  }
-  const minutes = Math.floor(durationMs / 60_000);
-  const seconds = Math.round((durationMs % 60_000) / 1000);
-  return `${minutes}m ${seconds}s`;
 }
 
 function renderAvatar(role: string, assistant?: Pick<AssistantIdentity, "name" | "avatar">) {

@@ -28,8 +28,9 @@ export type ToolStreamEntry = {
 type ToolStreamHost = {
   sessionKey: string;
   chatRunId: string | null;
-  chatStreamStartedAt?: number | null;
-  chatLastDurationMs?: number | null;
+  chatStream: string | null;
+  chatStreamStartedAt: number | null;
+  chatStreamSegments: Array<{ text: string; ts: number }>;
   toolStreamById: Map<string, ToolStreamEntry>;
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
@@ -233,10 +234,14 @@ export function scheduleToolStreamSync(host: ToolStreamHost, force = false) {
 }
 
 export function resetToolStream(host: ToolStreamHost) {
+  if (host.toolStreamSyncTimer != null) {
+    clearTimeout(host.toolStreamSyncTimer);
+    host.toolStreamSyncTimer = null;
+  }
   host.toolStreamById.clear();
   host.toolStreamOrder = [];
   host.chatToolMessages = [];
-  flushToolStreamSync(host);
+  host.chatStreamSegments = [];
 }
 
 export type CompactionStatus = {
@@ -384,47 +389,6 @@ function handleLifecycleFallbackEvent(host: CompactionHost, payload: AgentEventP
   }, FALLBACK_TOAST_DURATION_MS);
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return null;
-  }
-  return value;
-}
-
-function handleLifecycleDurationEvent(host: ToolStreamHost, payload: AgentEventPayload) {
-  if (payload.stream !== "lifecycle") {
-    return;
-  }
-  const data = payload.data ?? {};
-  const phase = toTrimmedString(data.phase);
-  if (!phase || (phase !== "start" && phase !== "end" && phase !== "error")) {
-    return;
-  }
-
-  const accepted = resolveAcceptedSession(host, payload, { allowSessionScopedWhenIdle: true });
-  if (!accepted.accepted) {
-    return;
-  }
-
-  const startedAt = toFiniteNumber(data.startedAt);
-  const endedAt = toFiniteNumber(data.endedAt);
-  if (phase === "start") {
-    if (startedAt !== null) {
-      host.chatStreamStartedAt = startedAt;
-    }
-    return;
-  }
-
-  const fallbackStart = toFiniteNumber(host.chatStreamStartedAt);
-  const terminalTs = endedAt ?? toFiniteNumber(payload.ts) ?? Date.now();
-  const start = startedAt ?? fallbackStart;
-  if (start === null) {
-    return;
-  }
-
-  host.chatLastDurationMs = Math.max(0, terminalTs - start);
-}
-
 export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPayload) {
   if (!payload) {
     return;
@@ -437,7 +401,6 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   }
 
   if (payload.stream === "lifecycle" || payload.stream === "fallback") {
-    handleLifecycleDurationEvent(host, payload);
     handleLifecycleFallbackEvent(host as CompactionHost, payload);
     return;
   }
@@ -445,11 +408,14 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   if (payload.stream !== "tool") {
     return;
   }
-  const accepted = resolveAcceptedSession(host, payload);
-  if (!accepted.accepted) {
+
+  // Filter by session only. Don't check chatRunId because the client sets it
+  // to a client-generated UUID (via generateUUID in sendChatMessage), while
+  // tool events arrive with the server's engine runId — they can never match.
+  const sessionKey = typeof payload.sessionKey === "string" ? payload.sessionKey : undefined;
+  if (sessionKey && sessionKey !== host.sessionKey) {
     return;
   }
-  const sessionKey = accepted.sessionKey;
 
   const data = payload.data ?? {};
   const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : "";
@@ -469,6 +435,13 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   const now = Date.now();
   let entry = host.toolStreamById.get(toolCallId);
   if (!entry) {
+    // Commit any in-progress streaming text as a segment so it renders
+    // above the tool card instead of below it.
+    if (host.chatStream && host.chatStream.trim().length > 0) {
+      host.chatStreamSegments = [...host.chatStreamSegments, { text: host.chatStream, ts: now }];
+      host.chatStream = null;
+      host.chatStreamStartedAt = null;
+    }
     entry = {
       toolCallId,
       runId: payload.runId,

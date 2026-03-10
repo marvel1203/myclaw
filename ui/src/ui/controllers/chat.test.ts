@@ -11,7 +11,6 @@ function createState(overrides: Partial<ChatState> = {}): ChatState {
     chatSending: false,
     chatStream: null,
     chatStreamStartedAt: null,
-    chatLastDurationMs: null,
     chatThinkingLevel: null,
     client: null,
     connected: true,
@@ -219,8 +218,7 @@ describe("handleChatEvent", () => {
       message: finalMsg,
     };
     expect(handleChatEvent(state, payload)).toBe("final");
-    expect(state.chatMessages).toHaveLength(1);
-    expect(state.chatMessages[0]).toMatchObject(finalMsg);
+    expect(state.chatMessages).toEqual([finalMsg]);
     expect(state.chatStream).toBe(null);
   });
 
@@ -242,36 +240,10 @@ describe("handleChatEvent", () => {
       },
     };
     expect(handleChatEvent(state, payload)).toBe("final");
-    expect(state.chatMessages).toHaveLength(1);
-    expect(state.chatMessages[0]).toMatchObject(payload.message as Record<string, unknown>);
+    expect(state.chatMessages).toEqual([payload.message]);
     expect(state.chatRunId).toBe(null);
     expect(state.chatStream).toBe(null);
     expect(state.chatStreamStartedAt).toBe(null);
-  });
-
-  it("attaches lifecycle duration metadata to final assistant message", () => {
-    const state = createState({
-      sessionKey: "main",
-      chatRunId: "run-1",
-      chatStreamStartedAt: 100,
-      chatLastDurationMs: 2450,
-    });
-    const payload: ChatEventPayload = {
-      runId: "run-1",
-      sessionKey: "main",
-      state: "final",
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "Reply" }],
-      },
-    };
-
-    expect(handleChatEvent(state, payload)).toBe("final");
-    expect(state.chatMessages).toHaveLength(1);
-    const msg = state.chatMessages[0] as Record<string, unknown>;
-    const marker = msg.__openclaw as Record<string, unknown>;
-    expect(marker.durationMs).toBe(2450);
-    expect(state.chatLastDurationMs).toBe(null);
   });
 
   it("processes aborted from own run and keeps partial assistant message", () => {
@@ -303,9 +275,7 @@ describe("handleChatEvent", () => {
     expect(state.chatRunId).toBe(null);
     expect(state.chatStream).toBe(null);
     expect(state.chatStreamStartedAt).toBe(null);
-    expect(state.chatMessages).toHaveLength(2);
-    expect(state.chatMessages[0]).toEqual(existingMessage);
-    expect(state.chatMessages[1]).toMatchObject(partialMessage);
+    expect(state.chatMessages).toEqual([existingMessage, partialMessage]);
   });
 
   it("falls back to streamed partial when aborted payload message is invalid", () => {
