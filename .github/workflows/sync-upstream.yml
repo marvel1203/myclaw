@@ -16,13 +16,15 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: main
           fetch-depth: 0
 
       - name: Sync from upstream
         run: |
           set -euo pipefail
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
           git remote add upstream https://github.com/openclaw/openclaw.git || true
-          git fetch upstream master
-          git merge --ff-only upstream/master || git merge --no-edit upstream/master
-          git push origin master
+          git fetch upstream main
+          git merge --ff-only upstream/main || git merge --no-edit upstream/main
+          git push origin main
