@@ -3,7 +3,8 @@ name: Sync upstream repository
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"
+    # Run daily at 02:00 UTC
+    - cron: "0 2 * * *"
 
 permissions:
   contents: write
@@ -15,15 +16,13 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
+          ref: master
           fetch-depth: 0
 
       - name: Sync from upstream
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
           git remote add upstream https://github.com/openclaw/openclaw.git || true
-          git fetch upstream "$DEFAULT_BRANCH"
-          git checkout "$DEFAULT_BRANCH"
-          git merge --ff-only "upstream/$DEFAULT_BRANCH" || git merge --no-edit "upstream/$DEFAULT_BRANCH"
-          git push origin "$DEFAULT_BRANCH"
+          git fetch upstream master
+          git merge --ff-only upstream/master || git merge --no-edit upstream/master
+          git push origin master
