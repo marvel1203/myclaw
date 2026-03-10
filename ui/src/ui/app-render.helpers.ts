@@ -37,7 +37,6 @@ function resetChatStateForSessionSwitch(state: AppViewState, sessionKey: string)
   state.chatMessage = "";
   state.chatStream = null;
   (state as unknown as OpenClawApp).chatStreamStartedAt = null;
-  (state as unknown as OpenClawApp).chatLastDurationMs = null;
   state.chatRunId = null;
   (state as unknown as OpenClawApp).resetToolStream();
   (state as unknown as OpenClawApp).resetChatScroll();
@@ -185,7 +184,6 @@ export function renderChatControls(state: AppViewState) {
             state.chatMessage = "";
             state.chatStream = null;
             (state as unknown as OpenClawApp).chatStreamStartedAt = null;
-            (state as unknown as OpenClawApp).chatLastDurationMs = null;
             state.chatRunId = null;
             (state as unknown as OpenClawApp).resetToolStream();
             (state as unknown as OpenClawApp).resetChatScroll();

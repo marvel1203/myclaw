@@ -1,3 +1,4 @@
+import { resetToolStream } from "../app-tool-stream.ts";
 import { extractText } from "../chat/message-extract.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { ChatAttachment } from "../ui-types.ts";
@@ -39,7 +40,6 @@ export type ChatState = {
   chatRunId: string | null;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
-  chatLastDurationMs: number | null;
   lastError: string | null;
 };
 
@@ -51,31 +51,16 @@ export type ChatEventPayload = {
   errorMessage?: string;
 };
 
-function resolveRunDurationMs(state: ChatState): number | null {
-  if (typeof state.chatLastDurationMs === "number" && Number.isFinite(state.chatLastDurationMs)) {
-    return Math.max(0, state.chatLastDurationMs);
+function maybeResetToolStream(state: ChatState) {
+  const toolHost = state as ChatState & Partial<Parameters<typeof resetToolStream>[0]>;
+  if (
+    toolHost.toolStreamById instanceof Map &&
+    Array.isArray(toolHost.toolStreamOrder) &&
+    Array.isArray(toolHost.chatToolMessages) &&
+    Array.isArray(toolHost.chatStreamSegments)
+  ) {
+    resetToolStream(toolHost as Parameters<typeof resetToolStream>[0]);
   }
-  if (typeof state.chatStreamStartedAt === "number" && Number.isFinite(state.chatStreamStartedAt)) {
-    return Math.max(0, Date.now() - state.chatStreamStartedAt);
-  }
-  return null;
-}
-
-function withDurationMetadata(message: Record<string, unknown>, durationMs: number | null) {
-  if (durationMs === null) {
-    return message;
-  }
-  const marker =
-    message.__openclaw && typeof message.__openclaw === "object"
-      ? (message.__openclaw as Record<string, unknown>)
-      : {};
-  return {
-    ...message,
-    __openclaw: {
-      ...marker,
-      durationMs,
-    },
-  };
 }
 
 export async function loadChatHistory(state: ChatState) {
@@ -95,6 +80,11 @@ export async function loadChatHistory(state: ChatState) {
     const messages = Array.isArray(res.messages) ? res.messages : [];
     state.chatMessages = messages.filter((message) => !isAssistantSilentReply(message));
     state.chatThinkingLevel = res.thinkingLevel ?? null;
+    // Clear all streaming state — history includes tool results and text
+    // inline, so keeping streaming artifacts would cause duplicates.
+    maybeResetToolStream(state);
+    state.chatStream = null;
+    state.chatStreamStartedAt = null;
   } catch (err) {
     state.lastError = String(err);
   } finally {
@@ -201,7 +191,6 @@ export async function sendChatMessage(
 
   state.chatSending = true;
   state.lastError = null;
-  state.chatLastDurationMs = null;
   const runId = generateUUID();
   state.chatRunId = runId;
   state.chatStream = "";
@@ -301,63 +290,46 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
-    const runDurationMs = resolveRunDurationMs(state);
     const finalMessage = normalizeFinalAssistantMessage(payload.message);
     if (finalMessage && !isAssistantSilentReply(finalMessage)) {
-      state.chatMessages = [
-        ...state.chatMessages,
-        withDurationMetadata(finalMessage, runDurationMs),
-      ];
+      state.chatMessages = [...state.chatMessages, finalMessage];
     } else if (state.chatStream?.trim() && !isSilentReplyStream(state.chatStream)) {
       state.chatMessages = [
         ...state.chatMessages,
-        withDurationMetadata(
-          {
-            role: "assistant",
-            content: [{ type: "text", text: state.chatStream }],
-            timestamp: Date.now(),
-          },
-          runDurationMs,
-        ),
+        {
+          role: "assistant",
+          content: [{ type: "text", text: state.chatStream }],
+          timestamp: Date.now(),
+        },
       ];
     }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    state.chatLastDurationMs = null;
   } else if (payload.state === "aborted") {
-    const runDurationMs = resolveRunDurationMs(state);
     const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
     if (normalizedMessage && !isAssistantSilentReply(normalizedMessage)) {
-      state.chatMessages = [
-        ...state.chatMessages,
-        withDurationMetadata(normalizedMessage, runDurationMs),
-      ];
+      state.chatMessages = [...state.chatMessages, normalizedMessage];
     } else {
       const streamedText = state.chatStream ?? "";
       if (streamedText.trim() && !isSilentReplyStream(streamedText)) {
         state.chatMessages = [
           ...state.chatMessages,
-          withDurationMetadata(
-            {
-              role: "assistant",
-              content: [{ type: "text", text: streamedText }],
-              timestamp: Date.now(),
-            },
-            runDurationMs,
-          ),
+          {
+            role: "assistant",
+            content: [{ type: "text", text: streamedText }],
+            timestamp: Date.now(),
+          },
         ];
       }
     }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    state.chatLastDurationMs = null;
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    state.chatLastDurationMs = null;
     state.lastError = payload.errorMessage ?? "chat error";
   }
   return payload.state;

@@ -54,16 +54,6 @@
   opacity: 0.7;
 }
 
-.chat-group-duration {
-  font-size: 11px;
-  color: var(--muted);
-  opacity: 0.9;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 1px 6px;
-  line-height: 1.5;
-}
-
 /* Chat divider (e.g., compaction marker) */
 .chat-divider {
   display: flex;
