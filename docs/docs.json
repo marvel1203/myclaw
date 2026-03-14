@@ -875,6 +875,7 @@
                   "install/fly",
                   "install/hetzner",
                   "install/gcp",
+                  "install/mac-mini",
                   "install/macos-vm",
                   "install/exe-dev",
                   "install/railway",

@@ -26,6 +26,7 @@ Native companion apps for Windows are also planned; the Gateway is recommended v
 ## VPS & hosting
 
 - VPS hub: [VPS hosting](/vps)
+- Dedicated Mac mini: [Mac mini](/install/mac-mini)
 - Fly.io: [Fly.io](/install/fly)
 - Hetzner (Docker): [Hetzner](/install/hetzner)
 - GCP (Compute Engine): [GCP](/install/gcp)
