@@ -283,6 +283,15 @@ describe("feishu_doc image fetch hardening", () => {
     fetchRemoteMediaMock.mockRejectedValueOnce(
       new Error("Blocked: resolves to private/internal IP address"),
     );
+    blockListMock
+      .mockResolvedValueOnce({ code: 0, data: { items: [] } })
+      .mockResolvedValueOnce({ code: 0, data: { items: [] } })
+      .mockResolvedValueOnce({
+        code: 0,
+        data: {
+          items: [{ block_id: "img_block_1", parent_id: "doc_1", block_type: 27 }],
+        },
+      });
 
     const feishuDocTool = resolveFeishuDocTool();
 
@@ -384,6 +393,42 @@ describe("feishu_doc image fetch hardening", () => {
         }),
       }),
     );
+  });
+
+  it("create writes initial content when content is provided", async () => {
+    convertMock.mockResolvedValueOnce({
+      code: 0,
+      data: {
+        blocks: [{ block_type: 2, block_id: "init_1" }],
+        first_level_block_ids: ["init_1"],
+      },
+    });
+    blockDescendantCreateMock.mockResolvedValueOnce({
+      code: 0,
+      data: { children: [{ block_type: 2, block_id: "init_1" }] },
+    });
+    blockListMock
+      .mockResolvedValueOnce({ code: 0, data: { items: [] } })
+      .mockResolvedValueOnce({ code: 0, data: { items: [] } })
+      .mockResolvedValueOnce({
+        code: 0,
+        data: {
+          items: [{ block_id: "init_1", parent_id: "doc_created", block_type: 2 }],
+        },
+      });
+
+    const feishuDocTool = resolveFeishuDocTool();
+
+    const result = await feishuDocTool.execute("tool-call", {
+      action: "create",
+      title: "Demo",
+      content: "hello world",
+    });
+
+    expect(result.details.document_id).toBe("doc_created");
+    expect(result.details.success).toBe(true);
+    expect(result.details.blocks_added).toBe(1);
+    expect(blockDescendantCreateMock).toHaveBeenCalled();
   });
 
   it("create skips requester grant when trusted requester identity is unavailable", async () => {

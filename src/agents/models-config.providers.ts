@@ -561,6 +561,41 @@ export function normalizeProviders(params: {
       normalizedProvider = antigravityNormalized;
     }
 
+    if (normalizedKey === "github-copilot") {
+      const providerHeaders = normalizedProvider.headers ?? {};
+      const requiredHeaders = {
+        "User-Agent": "GitHubCopilotChat/0.35.0",
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "Copilot-Integration-Id": "vscode-chat",
+      } as const;
+      const mergedProviderHeaders = { ...requiredHeaders, ...providerHeaders };
+      const nextModels = normalizedProvider.models.map((model) => ({
+        ...model,
+        headers: { ...requiredHeaders, ...model.headers },
+      }));
+      const headersChanged =
+        Object.keys(requiredHeaders).some(
+          (key) =>
+            (providerHeaders as Record<string, string | undefined>)[key] !== requiredHeaders[key],
+        ) ||
+        normalizedProvider.models.some((model) =>
+          Object.keys(requiredHeaders).some(
+            (key) =>
+              (model.headers as Record<string, string | undefined> | undefined)?.[key] !==
+              requiredHeaders[key],
+          ),
+        );
+      if (headersChanged) {
+        mutated = true;
+        normalizedProvider = {
+          ...normalizedProvider,
+          headers: mergedProviderHeaders,
+          models: nextModels,
+        };
+      }
+    }
+
     const existing = next[normalizedKey];
     if (existing) {
       // Keep deterministic behavior if users accidentally define duplicate

@@ -823,7 +823,7 @@ async function createDoc(
   client: Lark.Client,
   title: string,
   folderToken?: string,
-  options?: { grantToRequester?: boolean; requesterOpenId?: string },
+  options?: { grantToRequester?: boolean; requesterOpenId?: string; content?: string },
 ) {
   const res = await client.docx.document.create({
     data: { title, folder_token: folderToken },
@@ -865,10 +865,24 @@ async function createDoc(
     }
   }
 
+  let writeResult:
+    | {
+        success: boolean;
+        blocks_deleted: number;
+        blocks_added: number;
+        images_processed: number;
+      }
+    | undefined;
+  const initialContent = options?.content?.trim();
+  if (initialContent) {
+    writeResult = await writeDoc(client, docToken, initialContent, 30 * 1024 * 1024);
+  }
+
   return {
     document_id: docToken,
     title: doc?.title,
     url: `https://feishu.cn/docx/${docToken}`,
+    ...(writeResult ?? {}),
     ...(shouldGrantToRequester && {
       requester_permission_added: requesterPermissionAdded,
       ...(requesterOpenId && { requester_open_id: requesterOpenId }),
@@ -1418,6 +1432,7 @@ export function registerFeishuDocTools(api: OpenClawPluginApi) {
                 case "create":
                   return json(
                     await createDoc(client, p.title, p.folder_token, {
+                      content: p.content,
                       grantToRequester: p.grant_to_requester,
                       requesterOpenId: trustedRequesterOpenId,
                     }),
